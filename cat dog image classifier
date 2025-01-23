@@ -1,0 +1,136 @@
+# Import Required Libraries
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+# Set the path to the dataset
+base_dir = 'cats_and_dogs'  # Adjust this path as necessary
+train_dir = os.path.join(base_dir, 'train')
+validation_dir = os.path.join(base_dir, 'validation')
+test_dir = os.path.join(base_dir, 'test')
+
+# Set image dimensions
+IMG_HEIGHT = 150
+IMG_WIDTH = 150
+BATCH_SIZE = 32
+
+# Create ImageDataGenerators for train, validation, and test datasets
+train_data_gen = ImageDataGenerator(rescale=1./255)
+validation_data_gen = ImageDataGenerator(rescale=1./255)
+test_data_gen = ImageDataGenerator(rescale=1./255)
+
+# Flow from directory for each dataset
+train_data_gen = train_data_gen.flow_from_directory(
+    train_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='binary'
+)
+
+validation_data_gen = validation_data_gen.flow_from_directory(
+    validation_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='binary'
+)
+
+test_data_gen = test_data_gen.flow_from_directory(
+    test_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=1,
+    class_mode=None,
+    shuffle=False
+)
+
+# Function to plot images
+def plotImages(images, probabilities=None):
+    plt.figure(figsize=(10, 10))
+    for i in range(5):
+        ax = plt.subplot(1, 5, i + 1)
+        plt.imshow(images[i])
+        if probabilities is not None:
+            plt.title(f"{probabilities[i]*100:.2f}%")
+        plt.axis("off")
+    plt.show()
+
+# Plot five random training images
+sample_images, _ = next(train_data_gen)
+plotImages(sample_images)
+
+# Create a new ImageDataGenerator with augmentation
+train_image_generator = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=40,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+
+# Create the train data generator with the new augmentations
+train_data_gen = train_image_generator.flow_from_directory(
+    train_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='binary'
+)
+
+# Plot five augmented images
+augmented_images, _ = next(train_data_gen)
+plotImages(augmented_images)
+
+# Create and Compile the Model
+model = tf.keras.Sequential([
+    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)),
+    tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
+    
+    tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
+    
+    tf.keras.layers.Conv2D(128, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
+    
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(512, activation='relu'),
+    tf.keras.layers.Dense(1, activation='sigmoid')  # Binary classification
+])
+
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+# Train the Model
+history = model.fit(
+    train_data_gen,
+    steps_per_epoch=train_data_gen.samples // BATCH_SIZE,
+    epochs=10,  # You can increase this for better accuracy
+    validation_data=validation_data_gen,
+    validation_steps=validation_data_gen.samples // BATCH_SIZE
+)
+
+# Plot training & validation accuracy values
+plt.figure(figsize=(12, 4))
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Model accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+
+# Plot training & validation loss values
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Model loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+
+# Predict on Test Data
+test_images, _ =
